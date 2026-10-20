@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>이름 연상 이미지</title>
+<title>이름 닮은 동물</title>
 <style>
   /* 화면 전체 기본 스타일 */
   body {
@@ -93,6 +93,28 @@
     text-align: center;
   }
 
+  /* "OO 님을 닮은 동물" 결과 */
+  #animalResult {
+    margin: 0 0 20px;
+    text-align: center;
+  }
+  #animalResult:empty {
+    display: none;
+  }
+  #animalEmoji {
+    font-size: 64px;
+    line-height: 1.2;
+  }
+  #animalName {
+    margin: 4px 0;
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+  }
+  #animalTrait {
+    color: #777;
+  }
+
   /* 이미지들을 바둑판 모양으로 배치 */
   #gallery {
     display: grid;
@@ -101,6 +123,7 @@
   }
 
   #gallery a {
+    position: relative; /* 자막을 이미지 위에 겹치기 위해 */
     display: block;
     aspect-ratio: 1 / 1;
     border-radius: 12px;
@@ -117,6 +140,23 @@
   }
   #gallery a:hover img {
     transform: scale(1.05);
+  }
+
+  /* 이미지 아래쪽에 얹는 웃긴 자막 (밈 스타일: 흰 글씨 + 검은 테두리) */
+  .caption {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 8px;
+    color: white;
+    font-size: 16px;
+    font-weight: 900;
+    text-align: center;
+    line-height: 1.3;
+    text-shadow:
+      -2px -2px 0 #000, 2px -2px 0 #000,
+      -2px 2px 0 #000, 2px 2px 0 #000,
+      0 0 6px rgba(0, 0, 0, 0.6);
   }
 
   #credit {
@@ -140,7 +180,6 @@
     }
     #guide {
       font-size: 14px;
-      text-align: center;
     }
     #nameInput {
       font-size: 16px; /* 16px 미만이면 아이폰이 입력할 때 화면을 확대해버림 */
@@ -157,6 +196,9 @@
     #gallery a {
       border-radius: 8px;
     }
+    .caption {
+      font-size: 14px;
+    }
   }
 </style>
 </head>
@@ -164,46 +206,95 @@
 
   <!-- 1. 이름 입력란 -->
   <section class="panel">
-    <h1>이름 연상 이미지</h1>
-    <p id="guide">이름을 입력하면 그 이름에서 떠오르는 이미지를 보여드려요.</p>
+    <h1>이름 닮은 동물</h1>
+    <p id="guide">사람 이름을 입력하면 그 이름에서 떠오르는 동물의 웃긴 사진을 보여드려요.</p>
 
     <form id="searchForm">
-      <input id="nameInput" type="text" placeholder="예: 이순신, 고양이, 서울" autocomplete="off" />
+      <input id="nameInput" type="text" placeholder="예: 홍길동" autocomplete="off" />
       <button id="searchButton" type="submit">보기</button>
     </form>
   </section>
 
   <!-- 2. 이미지 보여주는 란 -->
   <section class="panel">
-    <div id="status">위에 이름을 입력하면 여기에 이미지가 나타나요.</div>
+    <div id="animalResult"></div>
+    <div id="status">위에 이름을 입력하면 여기에 동물 사진이 나타나요.</div>
     <div id="gallery"></div>
-    <p id="credit">이미지 출처: 위키미디어 공용(Wikimedia Commons) · 이미지를 누르면 원본 페이지가 열립니다.</p>
+    <p id="credit">사진 출처: 위키미디어 공용(Wikimedia Commons) · 사진을 누르면 원본 페이지가 열립니다.</p>
   </section>
 
   <script>
     // 한 번에 보여줄 이미지 개수
     const IMAGE_COUNT = 12;
 
+    // 이름에 짝지어 줄 동물 목록
+    // queries: 웃긴 모습이 잘 나오는 검색어 (앞에서부터 차례로 검색해서 사진을 모읍니다)
+    const ANIMALS = [
+      { name: '호랑이', emoji: '🐯', trait: '하품 한 번에 온 동네가 조용해지는 카리스마', queries: ['yawning tiger', 'tiger cub playing'] },
+      { name: '사자', emoji: '🦁', trait: '하루 20시간 자도 왕은 왕', queries: ['yawning lion', 'lion cub playing'] },
+      { name: '여우', emoji: '🦊', trait: '눈치 빠르고 하품도 귀여운 꾀돌이', queries: ['fox yawning', 'fox jumping snow'] },
+      { name: '곰', emoji: '🐻', trait: '느긋하지만 먹을 때는 진심', queries: ['bear yawning', 'bear cub playing'] },
+      { name: '고양이', emoji: '🐱', trait: '도도한 척하지만 허당미 가득', queries: ['cat yawning', 'funny cat'] },
+      { name: '강아지', emoji: '🐶', trait: '혀 내밀고 다니는 해맑은 인싸', queries: ['dog tongue out', 'funny dog'] },
+      { name: '부엉이', emoji: '🦉', trait: '밤만 되면 눈이 초롱초롱한 올빼미족', queries: ['owl yawning', 'owl winking'] },
+      { name: '펭귄', emoji: '🐧', trait: '뒤뚱뒤뚱 걸어도 목표는 확실', queries: ['penguin yawning', 'penguin waddling'] },
+      { name: '판다', emoji: '🐼', trait: '구르기만 해도 사랑받는 존재', queries: ['giant panda playing', 'giant panda sleeping'] },
+      { name: '수달', emoji: '🦦', trait: '물에 동동 떠서 노는 게 제일 좋아', queries: ['sea otter floating', 'otter yawning'] },
+      { name: '코알라', emoji: '🐨', trait: '잠이 보약, 하루 종일 꾸벅꾸벅', queries: ['koala yawning', 'koala sleeping'] },
+      { name: '햄스터', emoji: '🐹', trait: '볼에 간식 숨겨 두는 알뜰살뜰형', queries: ['hamster cheeks', 'hamster eating'] },
+      { name: '알파카', emoji: '🦙', trait: '표정 하나로 모두를 웃기는 개그맨', queries: ['llama tongue', 'alpaca funny'] },
+      { name: '나무늘보', emoji: '🦥', trait: '천천히 가도 결국 도착하는 여유파', queries: ['sloth hanging', 'sloth smiling'] },
+      { name: '하마', emoji: '🦛', trait: '입 크게 벌리고 웃는 호탕한 성격', queries: ['hippopotamus yawning', 'hippopotamus mouth open'] },
+      { name: '원숭이', emoji: '🐵', trait: '표정 부자, 장난기 만렙', queries: ['monkey yawning', 'macaque funny face'] },
+      { name: '다람쥐', emoji: '🐿️', trait: '부지런히 모으고 열심히 먹는 저축왕', queries: ['squirrel eating', 'squirrel cheeks'] },
+      { name: '물범', emoji: '🦭', trait: '뒹굴뒹굴 누워 있어도 귀여움 만렙', queries: ['seal yawning', 'harbor seal lying'] },
+      { name: '개구리', emoji: '🐸', trait: '어디로 튈지 모르는 엉뚱한 매력', queries: ['funny frog', 'tree frog'] }
+    ];
+
+    // 사진 위에 얹을 웃긴 자막 목록
+    const CAPTIONS = [
+      '월요일 아침의 나', '퇴근 5분 전', '다이어트는 내일부터', '점심 메뉴 고민 중',
+      '알람 다섯 번째 끔', '회의 30분째', '월급날 하루 전', '주말이 벌써 끝났다고?',
+      '치킨 냄새 맡음', '누가 나 불렀어?', '아무것도 하기 싫다', '카메라 의식 중',
+      '나 안 잤어, 진짜야', '택배 왔다는 소리 들음', '시험 기간의 나', '방 치우라는 소리 들음',
+      '단톡방 읽씹 당함', '커피 수혈 필요', '오늘 할 일: 없음', '간식 숨긴 거 들킴'
+    ];
+
     // 화면에 있는 요소들을 미리 찾아둡니다.
     const searchForm = document.getElementById('searchForm');
     const nameInput = document.getElementById('nameInput');
     const searchButton = document.getElementById('searchButton');
+    const animalResultElement = document.getElementById('animalResult');
     const statusElement = document.getElementById('status');
     const galleryElement = document.getElementById('gallery');
 
-    // 위키미디어 공용에서 이름으로 이미지를 검색해 [{ thumb, link, title }] 목록을 돌려주는 함수
-    async function searchImages(name) {
+    // 글자를 숫자로 바꿔주는 함수 (같은 글자를 넣으면 항상 같은 숫자가 나옴)
+    function hashText(text) {
+      let hash = 5381;
+      for (const char of text) {
+        hash = (hash * 33 + char.codePointAt(0)) >>> 0; // >>> 0: 항상 0 이상의 정수로 유지
+      }
+      return hash;
+    }
+
+    // 이름에 어울리는 동물을 골라주는 함수 (같은 이름이면 항상 같은 동물)
+    function pickAnimal(name) {
+      return ANIMALS[hashText(name) % ANIMALS.length];
+    }
+
+    // 위키미디어 공용에서 검색어 하나로 이미지를 찾아 [{ thumb, link, title }] 목록을 돌려주는 함수
+    async function searchImages(query) {
       const params = new URLSearchParams({
         action: 'query',
         format: 'json',
-        origin: '*',                           // 다른 사이트에서 호출할 수 있게 해주는 옵션
+        origin: '*',                            // 다른 사이트에서 호출할 수 있게 해주는 옵션
         generator: 'search',
-        gsrsearch: name + ' filetype:bitmap',  // 사진·그림 파일만 검색
-        gsrnamespace: '6',                     // 6번 = 파일 문서
+        gsrsearch: query + ' filetype:bitmap',  // 사진·그림 파일만 검색
+        gsrnamespace: '6',                      // 6번 = 파일 문서
         gsrlimit: String(IMAGE_COUNT),
         prop: 'imageinfo',
         iiprop: 'url',
-        iiurlwidth: '400'                      // 400px 크기의 썸네일 주소를 받음
+        iiurlwidth: '400'                       // 400px 크기의 썸네일 주소를 받음
       });
 
       const response = await fetch('https://commons.wikimedia.org/w/api.php?' + params);
@@ -230,20 +321,33 @@
         });
     }
 
-    // 검색 결과가 없을 때 쓰는 대체 이미지 목록 (같은 이름이면 항상 같은 이미지가 나옴)
-    function makeFallbackImages(name) {
+    // 동물의 검색어를 차례로 검색해서 사진을 IMAGE_COUNT장까지 모으는 함수
+    async function collectAnimalImages(animal) {
       const images = [];
-      for (let i = 0; i < IMAGE_COUNT; i++) {
-        const url = 'https://picsum.photos/seed/' + encodeURIComponent(name + '-' + i) + '/400/400';
-        images.push({ thumb: url, link: url, title: name + ' 연상 이미지 ' + (i + 1) });
+      const seenTitles = new Set(); // 같은 사진이 두 번 들어가지 않게 기억
+
+      for (const query of animal.queries) {
+        const results = await searchImages(query);
+        results.forEach(function (image) {
+          if (!seenTitles.has(image.title) && images.length < IMAGE_COUNT) {
+            seenTitles.add(image.title);
+            images.push(image);
+          }
+        });
+        // 충분히 모였으면 더 검색하지 않습니다.
+        if (images.length >= IMAGE_COUNT) {
+          break;
+        }
       }
       return images;
     }
 
-    // 이미지 목록을 화면에 그리는 함수
-    function renderGallery(images) {
+    // 이미지 목록을 화면에 그리는 함수 (이름마다 자막이 다르게, 같은 이름이면 같은 자막)
+    function renderGallery(images, name) {
       galleryElement.innerHTML = '';
-      images.forEach(function (image) {
+      const startIndex = hashText(name + '자막') % CAPTIONS.length;
+
+      images.forEach(function (image, i) {
         const link = document.createElement('a');
         link.href = image.link;
         link.target = '_blank';
@@ -255,9 +359,35 @@
         img.alt = image.title;
         img.loading = 'lazy';
 
+        const caption = document.createElement('span');
+        caption.className = 'caption';
+        caption.textContent = CAPTIONS[(startIndex + i) % CAPTIONS.length];
+
         link.appendChild(img);
+        link.appendChild(caption);
         galleryElement.appendChild(link);
       });
+    }
+
+    // 고른 동물을 화면 위쪽에 크게 보여주는 함수
+    function renderAnimal(name, animal) {
+      animalResultElement.innerHTML = '';
+
+      const emoji = document.createElement('div');
+      emoji.id = 'animalEmoji';
+      emoji.textContent = animal.emoji;
+
+      const title = document.createElement('div');
+      title.id = 'animalName';
+      title.textContent = name + ' 님을 닮은 동물은 ' + animal.name + '!';
+
+      const trait = document.createElement('div');
+      trait.id = 'animalTrait';
+      trait.textContent = animal.trait;
+
+      animalResultElement.appendChild(emoji);
+      animalResultElement.appendChild(title);
+      animalResultElement.appendChild(trait);
     }
 
     // 폼을 제출했을 때(보기 버튼 또는 Enter) 실행되는 함수
@@ -271,22 +401,23 @@
         return;
       }
 
+      const animal = pickAnimal(name);
+      renderAnimal(name, animal);
+
       searchButton.disabled = true;
-      statusElement.textContent = '"' + name + '"에서 떠오르는 이미지를 찾는 중...';
+      statusElement.textContent = animal.name + '의 웃긴 사진을 찾는 중...';
       galleryElement.innerHTML = '';
 
       try {
-        let images = await searchImages(name);
+        const images = await collectAnimalImages(animal);
         if (images.length > 0) {
-          statusElement.textContent = '"' + name + '" 하면 떠오르는 이미지';
+          statusElement.textContent = '';
+          renderGallery(images, name);
         } else {
-          // 딱 맞는 이미지가 없으면 이름으로 정해지는 랜덤 이미지를 대신 보여줍니다.
-          images = makeFallbackImages(name);
-          statusElement.textContent = '"' + name + '"에 딱 맞는 사진이 없어서, 이름이 골라준 이미지를 보여드려요';
+          statusElement.textContent = animal.name + ' 사진을 찾지 못했어요. 다시 시도해주세요.';
         }
-        renderGallery(images);
       } catch (error) {
-        statusElement.textContent = '이미지를 불러오지 못했어요. 잠시 후 다시 시도해주세요.';
+        statusElement.textContent = '사진을 불러오지 못했어요. 잠시 후 다시 시도해주세요.';
       } finally {
         searchButton.disabled = false;
       }
